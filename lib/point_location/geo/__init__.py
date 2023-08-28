@@ -1,0 +1,1 @@
+#!/usr/bin/env pythonimport lib.point_location.geo.shapes
