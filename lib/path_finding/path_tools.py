@@ -118,15 +118,15 @@ class DCEL_esque:
 
 
         # First edge tunes the topology of the points
-        left, right = edges[0].p1, edges[0].p2
-        if not ccw(left, start, right):
-            left, right = right, left
+        pl, pr = edges[0].p1, edges[0].p2
+        if not ccw(pl, start, pr):
+            pl, pr = pr, pl
 
         edges.pop(0)
 
         tail = [start]
-        left = [left]
-        right = [right]
+        left = [pl]
+        right = [pr]
 
         print("\noperation 0")
 
@@ -196,6 +196,22 @@ class DCEL_esque:
         tmp2 = {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
 
         return tmp, tmp2
+
+    def funny_funnel(self, triangle_path, triangle_hashes: list[str], start: Point, end: Point):
+        # Get the edge list
+        edges = []
+        for i in range(len(triangle_hashes) - 1):
+            edge_hash = self.compare_lists(self.triangles[triangle_hashes[i]]['edges'],
+                                           self.triangles[triangle_hashes[i + 1]]['edges'])
+            edges.append(self.edges[edge_hash])
+            pass
+
+        # First edge tunes the topology of the points
+        pl, pr = edges[0].p1, edges[0].p2
+        if not ccw(pl, start, pr):
+            pl, pr = pr, pl
+
+        return
 
     def compare_lists(self, l1, l2):
         for i in l1:

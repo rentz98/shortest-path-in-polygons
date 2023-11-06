@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
-from lib.triangulation.earcut import flatten, earcut
+from lib.triangulation.earcut import flatten, earcut, deviation
 from lib.point_location.geo.shapes import Point, Polygon, Triangle
 from lib.point_location.kirkpatrick import Locator
 from lib.path_finding.path_tools import DCEL_esque
@@ -27,6 +27,7 @@ poly_coords_y = [p[1] for p in island.points]
 
 flatten_dict = flatten([island.points])
 tri = earcut(flatten_dict['vertices'], flatten_dict['holes'], flatten_dict['dimensions'])
+d = deviation(flatten_dict['vertices'], [], 2, tri)
 points = flatten_dict["vertices"]
 
 
