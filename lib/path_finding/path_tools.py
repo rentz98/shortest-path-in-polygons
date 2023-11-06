@@ -79,9 +79,32 @@ class DCEL_esque:
         return [self.triangles[h]['triangle'] for h in triangle_hashes]
 
     def funnel(self, triangle_path, triangle_hashes, start: Point, end: Point):
-        tail = []
-        right = []
-        left = []
+        # tail = []
+        # right = []
+        # left = []
+        #
+        # edges = []
+        # for i in range(len(triangle_hashes) - 1):
+        #     edge_hash = self.compare_lists(self.triangles[triangle_hashes[i]]['edges'],
+        #                                    self.triangles[triangle_hashes[i + 1]]['edges'])
+        #     edges.append(self.edges[edge_hash])
+        #
+        # tmp = []
+        # for e in edges:
+        #     tmp.append({'x': [e.p1.x, e.p2.x, e.p1.x], 'y': [e.p1.y, e.p2.y, e.p1.y]})
+        #
+        # tail.append(start)
+        #
+        # for edge in edges:
+        #     pl, pr = edge.p1, edge.p2
+        #     if not ccw(pl, tail[-1], pr):
+        #         pl, pr = pr, pl
+        #     if pl != left[-1]:
+        #         left.append(pl)
+        #     if pr != right[-1]:
+        #         left.append(pr)
+        #
+        # return tmp
 
         edges = []
         for i in range(len(triangle_hashes) - 1):
@@ -93,18 +116,86 @@ class DCEL_esque:
         for e in edges:
             tmp.append({'x': [e.p1.x, e.p2.x, e.p1.x], 'y': [e.p1.y, e.p2.y, e.p1.y]})
 
-        tail.append(start)
 
+        # First edge tunes the topology of the points
+        left, right = edges[0].p1, edges[0].p2
+        if not ccw(left, start, right):
+            left, right = right, left
+
+        edges.pop(0)
+
+        tail = [start]
+        left = [left]
+        right = [right]
+
+        print("\noperation 0")
+
+        # Each subsequent edge will have a common point
         for edge in edges:
-            pl, pr = edge.p1, edge.p2
-            if not ccw(pl, tail[-1], pr):
-                pl, pr = pr, pl
-            if pl != left[-1]:
-                left.append(pl)
-            if pr != right[-1]:
-                left.append(pr)
 
-        return tmp
+            last_points = []
+            if right:
+                last_points.append(right[-1])
+            if left:
+                last_points.append(left[-1])
+
+            if len(last_points) == 0:
+                raise ValueError(" ")
+
+            if edge.p1 in last_points:
+                bound_point, free_point = edge.p1, edge.p2
+            elif edge.p2 in last_points:
+                bound_point, free_point = edge.p2, edge.p1
+            else:
+                print("ERROR")
+                return tmp, {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
+                raise KeyError("Edge is irrelevant to the funnel algorithm of out of place")
+
+            if left and bound_point == left[-1]:
+                if not right:
+                    right = [free_point]
+                elif not left or not ccw(left[0], tail[-1], free_point):
+                    # Crossing -> add to tail
+                    print("operation right.cross")
+                    while left and not ccw(left[0], tail[-1], free_point):
+                        tail.append(left.pop(0))
+                    right = [free_point]
+                elif ccw(right[-1], tail[-1], free_point):
+                    # widening -> add to left list
+                    print("operation right.wide")
+                    right.append(free_point)
+                else:
+                    # narrowing -> check list for inconsistencies
+                    while right and ccw(free_point, tail[-1], right[-1]):
+                        right.pop(-1)
+                    right.append(free_point)
+                    print("operation left.narrow")
+            elif right and bound_point == right[-1]:
+                if not left:
+                    left = [free_point]
+                elif not right or not ccw(free_point, tail[-1], right[0]):
+                    # Crossing -> add to tail
+                    print("operation left.cross")
+                    while right and not ccw(free_point, tail[-1], right[0]):
+                        tail.append(right.pop(0))
+                    left = [free_point]
+                elif ccw(free_point, tail[-1], left[-1]):
+                    # widening -> add to left list
+                    print("operation left.wide")
+                    left.append(free_point)
+                else:
+                    # narrowing -> check list for inconsistencies
+                    while left and ccw(left[-1], tail[-1], free_point):
+                        left.pop(-1)
+                    left.append(free_point)
+                    print("operation left.narrow")
+            else:
+                raise ValueError("sjkadha")
+        tail.append(end)
+
+        tmp2 = {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
+
+        return tmp, tmp2
 
     def compare_lists(self, l1, l2):
         for i in l1:

@@ -92,7 +92,7 @@ class Locator(object):
                         points_to_regions[point].add(idx)
                         continue
 
-                    points_to_regions[point] = set([idx])
+                    points_to_regions[point] = {idx}
 
             # Connect graph
             g = UndirectedGraph()
