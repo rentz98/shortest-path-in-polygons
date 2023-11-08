@@ -1,6 +1,9 @@
+from collections import deque
+
 from lib.point_location.geo.shapes import Point
 from lib.point_location.kirkpatrick import Locator
 from lib.point_location.geo.shapes import ccw
+
 
 
 def point_hash(p1: Point, p2: Point):
@@ -122,80 +125,172 @@ class DCEL_esque:
         if not ccw(pl, start, pr):
             pl, pr = pr, pl
 
-        edges.pop(0)
+        prev_edge = edges.pop(0)
 
-        tail = [start]
-        left = [pl]
-        right = [pr]
+        tail = deque((start,))
+        left = deque((pl,))
+        right = deque((pr,))
+
+        def finish_it():
+
+            if left and ccw(tail[-1], left[-1], end):
+                tail.append(left[-1])
+            elif right and ccw(end, right[-1], tail[-1]):
+                tail.append(right[-1])
+            tail.append(end)
+
+            tmp2 = {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
+            return tmp2
 
         print("\noperation 0")
 
         # Each subsequent edge will have a common point
         for edge in edges:
 
-            last_points = []
-            if right:
-                last_points.append(right[-1])
-            if left:
-                last_points.append(left[-1])
 
-            if len(last_points) == 0:
-                raise ValueError(" ")
+            # Get the points of the last edge.
+            last_points = [prev_edge.p1, prev_edge.p2]
+
+            # if right:
+            #     last_points.append(right[-1])
+            # if left:
+            #     last_points.append(left[-1])
+            #
+            # if len(last_points) <= 0:
+            #     raise ValueError("No stored previous points.")
 
             if edge.p1 in last_points:
                 bound_point, free_point = edge.p1, edge.p2
             elif edge.p2 in last_points:
                 bound_point, free_point = edge.p2, edge.p1
             else:
-                print("ERROR")
-                return tmp, {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
-                raise KeyError("Edge is irrelevant to the funnel algorithm of out of place")
+                raise ValueError("No common points between 2 consecutive edges.")
 
-            if left and bound_point == left[-1]:
-                if not right:
-                    right = [free_point]
-                elif not left or not ccw(left[0], tail[-1], free_point):
-                    # Crossing -> add to tail
-                    print("operation right.cross")
-                    while left and not ccw(left[0], tail[-1], free_point):
-                        tail.append(left.pop(0))
-                    right = [free_point]
+            if bound_point == left[-1]:
+                # The common point between this and the last edges
+                # is the left and the free point is the right.
+
+                if not ccw(left[-1], tail[-1], free_point):
+                    # Left is on the right of right.
+                    print("op[right]: crossing")
+
+                    # Progressively remove items from left and add them to tail
+                    # until there is no more crossing of right to left.
+                    last_left_point = None
+                    while left and not ccw(left[-1], tail[-1], free_point):
+                        last_left_point = left.pop()
+                        tail.append(last_left_point)
+
+                    if last_left_point is not None:
+                        left.append(last_left_point)
+
+                    # # Reset the right list.
+                    # right.clear()
                 elif ccw(right[-1], tail[-1], free_point):
-                    # widening -> add to left list
-                    print("operation right.wide")
-                    right.append(free_point)
+                    # In the right, the new point does not narrow the path,
+                    # but instead changes the direction (widening).
+                    print("op[right]: widening")
                 else:
-                    # narrowing -> check list for inconsistencies
-                    while right and ccw(free_point, tail[-1], right[-1]):
-                        right.pop(-1)
-                    right.append(free_point)
-                    print("operation left.narrow")
-            elif right and bound_point == right[-1]:
-                if not left:
-                    left = [free_point]
-                elif not right or not ccw(free_point, tail[-1], right[0]):
-                    # Crossing -> add to tail
-                    print("operation left.cross")
-                    while right and not ccw(free_point, tail[-1], right[0]):
-                        tail.append(right.pop(0))
-                    left = [free_point]
+                    # The next right point narrows the path (no violation).
+                    print("op[right]: narrowing")
+
+                    # Remove all the right points until there is widening.
+                    # This means that the last right point is potentially a tail point.
+                    while right and not ccw(right[-1], tail[-1], free_point):
+                        right.pop()
+                    pass
+                # Append the free point.
+                right.append(free_point)
+            elif bound_point == right[-1]:
+                # The common point between this and the last edges
+                # is the right and the free point is the left.
+                if not ccw(free_point, tail[-1], right[-1]):
+                    # The right is on the left of left.
+                    print("op[left]: crossing")
+
+                    # Progressively remove items from left and add them to tail
+                    # until there is no more crossing of right to left.
+                    last_right_point = None
+                    while right and not ccw(right[-1], tail[-1], free_point):
+                        last_right_point = left.pop()
+                        tail.append(last_right_point)
+
+                    if last_right_point is not None:
+                        right.append(last_right_point)
+
+                    # # Reset the right list.
+                    # right.clear()
                 elif ccw(free_point, tail[-1], left[-1]):
-                    # widening -> add to left list
-                    print("operation left.wide")
-                    left.append(free_point)
+                    # In the right, the new point does not narrow the path,
+                    # but instead changes the direction (widening).
+                    print("op[left]: widening")
                 else:
-                    # narrowing -> check list for inconsistencies
-                    while left and ccw(left[-1], tail[-1], free_point):
-                        left.pop(-1)
-                    left.append(free_point)
-                    print("operation left.narrow")
+                    # The next left point narrows the path (no violation).
+                    print("op[left]: narrowing")
+
+                    # Remove all the left points until there is widening.
+                    # This means that the last right point is potentially a tail point.
+                    while left and not ccw(free_point, tail[-1], left[-1]):
+                        left.pop()
+                    pass
+
+                # Append the free point.
+                left.append(free_point)
             else:
-                raise ValueError("sjkadha")
-        tail.append(end)
+                raise ValueError("No common bound point.")
+                pass
 
-        tmp2 = {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
 
-        return tmp, tmp2
+
+            # if left and bound_point == left[-1]:
+            #     if not right:
+            #         right = [free_point]
+            #     elif not ccw(left[0], tail[-1], free_point):
+            #         # Crossing -> add to tail
+            #         print("operation right.cross")
+            #         while left and not ccw(left[0], tail[-1], free_point):
+            #             tail.append(left.pop(0))
+            #         right = [free_point]
+            #     elif ccw(right[-1], tail[-1], free_point):
+            #         # widening -> add to left list
+            #         print("operation right.wide")
+            #         right.append(free_point)
+            #     else:
+            #         # narrowing -> check list for inconsistencies
+            #         while right and ccw(free_point, tail[-1], right[-1]):
+            #             right.pop(-1)
+            #         right.append(free_point)
+            #         print("operation left.narrow")
+            # elif right and bound_point == right[-1]:
+            #     if not left:
+            #         left = [free_point]
+            #     elif not right or not ccw(free_point, tail[-1], right[0]):
+            #         # Crossing -> add to tail
+            #         print("operation left.cross")
+            #         while right and not ccw(free_point, tail[-1], right[0]):
+            #             tail.append(right.pop(0))
+            #         left = [free_point]
+            #     elif ccw(free_point, tail[-1], left[-1]):
+            #         # widening -> add to left list
+            #         print("operation left.wide")
+            #         left.append(free_point)
+            #     else:
+            #         # narrowing -> check list for inconsistencies
+            #         while left and ccw(left[-1], tail[-1], free_point):
+            #             left.pop(-1)
+            #         left.append(free_point)
+            #         print("operation left.narrow")
+            # else:
+            #     raise ValueError("sjkadha")
+
+            # Update the previous edge
+            prev_edge = edge
+
+            # End for each edge in edges.
+            pass
+
+
+        return tmp, finish_it()
 
     def funny_funnel(self, triangle_path, triangle_hashes: list[str], start: Point, end: Point):
         # Get the edge list
