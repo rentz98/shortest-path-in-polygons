@@ -1,5 +1,6 @@
 from functools import reduce
 from lib.point_location.geo import shapes, spatial
+from lib.point_location.geo.shapes import Point, Polygon, Triangle
 from . import min_triangle
 from lib.point_location.geo.graph import UndirectedGraph, DirectedGraph
 
@@ -177,7 +178,7 @@ class Locator(object):
         while len(frontier) > 1:
             frontier = remove_independent_set(frontier)
 
-    def locate(self, p):
+    def locate(self, p) -> Triangle | None:
         """Locates the point p in one of the initial regions"""
         polygon, valid = self.annotatedLocate(p)
 
@@ -187,7 +188,7 @@ class Locator(object):
 
         return polygon
 
-    def annotatedLocate(self, p):
+    def annotatedLocate(self, p: Point) -> (Triangle | None, bool) :
         """
             Locates the point p, returning the region and whether or not
             the region was one of the initial regions (i.e., False if the

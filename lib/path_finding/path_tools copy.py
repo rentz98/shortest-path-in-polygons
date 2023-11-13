@@ -1,6 +1,6 @@
 from collections import deque
 
-from lib.point_location.geo.shapes import Point, Triangle
+from lib.point_location.geo.shapes import Point
 from lib.point_location.kirkpatrick import Locator
 from lib.point_location.geo.shapes import ccw
 
@@ -35,7 +35,7 @@ class DCEL_esque:
             self.triangles[this_triangle_hash] = {'triangle': t, 'edges': edges, 'neighbours': neighbors}
         return
 
-    def bfs(self, p1_triangle:Triangle, p2_triangle:Triangle):
+    def bfs(self, p1_triangle:Point, p2_triangle:Point):
         p1_hash = hash(p1_triangle)
         p2_hash = hash(p2_triangle)
 
@@ -47,7 +47,7 @@ class DCEL_esque:
 
         while queue:
             s = queue.pop(0)
-            # print('current triangle hash:', s)
+            print('current triangle hash:', s)
 
             if s == p2_hash:
                 return self.retrive_path(traversal, s)
@@ -132,38 +132,11 @@ class DCEL_esque:
         right = deque((pr,))
 
         def finish_it():
-            # while left or right:
-            #     if left:
-            #         item = left.popleft()
-            #         if ccw(tail[-1], item, end):
-            #             tail.append(item)
-            #     if right:
-            #         item = right.popleft()
-            #         if ccw(end, item, tail[-1]):
-            #             tail.append(item)
 
-            if right and right[0] in tail:
-                lists = [right, left]
-            else:
-                lists = [left, right]
-
-            for l in lists:
-                while l:
-                    item = l.popleft()
-                    if (l is left):
-                        if ccw(tail[-1], item, end):
-                            tail.append(item)
-                    else:
-                        if ccw(end, item, tail[-1]):
-                            tail.append(item)
-            # while left:
-            #     item = left.popleft()
-            #     if ccw(tail[-1], item, end):
-            #         tail.append(item)
-            # while right:
-            #     item = right.popleft()
-            #     if ccw(end, item, tail[-1]):
-            #         tail.append(item)
+            if left and ccw(tail[-1], left[-1], end):
+                tail.append(left[-1])
+            elif right and ccw(end, right[-1], tail[-1]):
+                tail.append(right[-1])
             tail.append(end)
 
             tmp2 = {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
@@ -192,37 +165,29 @@ class DCEL_esque:
                 bound_point, free_point = edge.p2, edge.p1
             else:
                 raise ValueError("No common points between 2 consecutive edges.")
-
-            if bound_point == left[-1]:
+            if left and bound_point == left[-1]:
                 # The common point between this and the last edges
                 # is the left and the free point is the right.
 
-                if bound_point == tail[-1]:
-                    print("op[right]: tail=left_bound")
-
-                    # Remove all other points since their fluctuations
-                    # do not contribute to the final path.
-                    right.clear()
-                elif right[0] == tail[-1]:
-                    print("op[right]: tail=right_last")
-                    right.popleft()
-                elif not ccw(left[0], tail[-1], free_point):
+                if not right:
+                    right.append(free_point)
+                elif not ccw(left[-1], tail[-1], free_point):
                     # Left is on the right of right.
                     print("op[right]: crossing")
 
                     # Progressively remove items from left and add them to tail
                     # until there is no more crossing of right to left.
                     last_left_point = None
-                    while left and not ccw(left[0], tail[-1], free_point):
-                        last_left_point = left.popleft()
+                    while left and not ccw(left[-1], tail[-1], free_point):
+                        last_left_point = left.pop()
                         tail.append(last_left_point)
 
-                    if not left and last_left_point is not None:
-                        left.append(last_left_point)
+                    # if last_left_point is not None:
+                    #     left.append(last_left_point)
 
                     # Reset the right list.
                     right.clear()
-                elif not ccw(tail[-1], right[-1], free_point):
+                elif ccw(right[-1], tail[-1], free_point):
                     # In the right, the new point does not narrow the path,
                     # but instead changes the direction (widening).
                     print("op[right]: widening")
@@ -232,41 +197,31 @@ class DCEL_esque:
 
                     # Remove all the right points until there is widening.
                     # This means that the last right point is potentially a tail point.
-                    # while right and not ccw(right[-1], tail[-1], free_point):
-                    while right and ccw(tail[-1], right[-1], free_point):
+                    while right and not ccw(right[-1], tail[-1], free_point):
                         right.pop()
                     pass
                 # Append the free point.
                 right.append(free_point)
-            elif bound_point == right[-1]:
+            elif right and bound_point == right[-1]:
                 # The common point between this and the last edges
                 # is the right and the free point is the left.
-                if bound_point == tail[-1]:
-                    print("op[left]: tail=right_bound (narrowing)")
-
-                    # Remove all other points since their fluctuations
-                    # do not contribute to the final path.
-                    left.clear()
-                elif left[0] == tail[-1]:
-                    print("op[left]: tail=left_last")
-                    left.popleft()
-                elif not ccw(free_point, tail[-1], left[0]):
+                if not ccw(free_point, tail[-1], right[-1]):
                     # The right is on the left of left.
                     print("op[left]: crossing")
 
                     # Progressively remove items from left and add them to tail
                     # until there is no more crossing of right to left.
                     last_right_point = None
-                    while right and not ccw(free_point, tail[-1], right[0]):
-                        last_right_point = right.popleft()
+                    while right and not ccw(right[-1], tail[-1], free_point):
+                        last_right_point = left.pop()
                         tail.append(last_right_point)
 
-                    if not right and last_right_point is not None:
-                        right.append(last_right_point)
+                    # if last_right_point is not None:
+                    #     right.append(last_right_point)
 
                     # Reset the right list.
-                    left.clear()
-                elif ccw(tail[-1], left[-1], free_point):
+                    right.clear()
+                elif ccw(free_point, tail[-1], left[-1]):
                     # In the right, the new point does not narrow the path,
                     # but instead changes the direction (widening).
                     print("op[left]: widening")
@@ -276,8 +231,7 @@ class DCEL_esque:
 
                     # Remove all the left points until there is widening.
                     # This means that the last right point is potentially a tail point.
-                    # while left and not ccw(free_point, tail[-1], left[-1]):
-                    while left and not ccw(tail[-1], left[-1], free_point):
+                    while left and not ccw(free_point, tail[-1], left[-1]):
                         left.pop()
                     pass
 

@@ -45,6 +45,28 @@ locator = Locator(regions=triangles_polygon, outline=outline_polygon)
 
 dcel = DCEL_esque(triangles_polygon, locator)
 
+
+def calc_path(p1: Point, p2: Point, region1: Triangle = None, region2: Triangle = None):
+
+    if not region1:
+        region1 = locator.locate(p1)
+    if not region2:
+        region2 = locator.locate(p2)
+
+    if not region1 or not region2:
+        return
+
+    res = dcel.bfs(region1, region2)
+    tmp, tmp2 = dcel.funnel(region1, res, p1, p2)
+    pres = dcel.presentable_form(res)
+    # for i in pres:
+    #     plt.plot(i['x'], i['y'], 'r-')
+    # for i in tmp:
+    #     plt.plot(i['x'], i['y'], 'k-')
+    plt.plot(tmp2['x'], tmp2['y'], 'g-')
+    return
+
+
 one_point = False
 old_point = None
 
@@ -61,6 +83,7 @@ def onclick(event):
 
     if not triangle_region:
         print("Invalid point")
+        return
 
     one_point = not one_point
 
@@ -68,25 +91,41 @@ def onclick(event):
         old_point = point
         old_triangle_region = triangle_region
     else:
-        res = dcel.bfs(old_triangle_region, triangle_region)
-        tmp, tmp2 = dcel.funnel(old_triangle_region, res, old_point, point)
-        pres = dcel.presentable_form(res)
-        for i in pres:
-            plt.plot(i['x'], i['y'], 'r-')
-        plt.plot(tmp2['x'], tmp2['y'], 'g-')
+        calc_path(old_point, point, old_triangle_region, triangle_region)
 
     # target_region = locator.locate(point)
     plt_x = [p.x for p in triangle_region.points]
     plt_y = [p.y for p in triangle_region.points]
     plt_x.append(plt_x[0])
     plt_y.append(plt_y[0])
-    plt.plot(plt_x, plt_y, 'r-')
+    # plt.plot(plt_x, plt_y, 'r-')
     plt.plot(ex, ey, 'k.')
     plt.show()
     pass
 
 
-fig.canvas.mpl_connect('button_press_event', onclick)
 
+# p1 = Point(33.277286178158604, 30.731894537297677)
+# p2 = Point(22.07027392547043, 37.51042409394792)
+# p1 = Point(127.55627675389786, 36.1116798997185)
+# p2 = Point(49.527453944556456, 19.541940983462347)
+# p2 = Point(127.55627675389786, 36.1116798997185)
+# p1 = Point(49.527453944556456, 19.541940983462347)
+
+# p2 = Point(28.934568930241937, 63.65618095531315)
+# p1 = Point(-0.904101192540324, 38.80157258092892)
+
+# p1 = Point(6.2403691185483865, 60.858692566854316)
+# p2 = Point(-0.904101192540324, 38.80157258092892)
+# p2 = Point(6.2403691185483865, 60.858692566854316)
+# p1 = Point(-0.904101192540324, 38.80157258092892)
+#
+# p1 = Point(55.971485989852155, 25.029322053131594)
+# p2 = Point(82.44805243682796, 73.33979460767064)
+# p2 = Point(55.971485989852155, 25.029322053131594)
+# p1 = Point(82.44805243682796, 73.33979460767064)
+# calc_path(p1, p2)
+
+fig.canvas.mpl_connect('button_press_event', onclick)
 # fig.show()
 plt.show()
