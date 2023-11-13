@@ -184,8 +184,8 @@ class DCEL_esque:
                     if last_left_point is not None:
                         left.append(last_left_point)
 
-                    # # Reset the right list.
-                    # right.clear()
+                    # Reset the right list.
+                    right.clear()
                 elif ccw(right[-1], tail[-1], free_point):
                     # In the right, the new point does not narrow the path,
                     # but instead changes the direction (widening).
@@ -196,7 +196,8 @@ class DCEL_esque:
 
                     # Remove all the right points until there is widening.
                     # This means that the last right point is potentially a tail point.
-                    while right and not ccw(right[-1], tail[-1], free_point):
+                    # while right and not ccw(right[-1], tail[-1], free_point):
+                    while right and not ccw(tail[-1], right[-1], free_point):
                         right.pop()
                     pass
                 # Append the free point.
@@ -218,8 +219,8 @@ class DCEL_esque:
                     if last_right_point is not None:
                         right.append(last_right_point)
 
-                    # # Reset the right list.
-                    # right.clear()
+                    # Reset the right list.
+                    right.clear()
                 elif ccw(free_point, tail[-1], left[-1]):
                     # In the right, the new point does not narrow the path,
                     # but instead changes the direction (widening).
@@ -230,7 +231,8 @@ class DCEL_esque:
 
                     # Remove all the left points until there is widening.
                     # This means that the last right point is potentially a tail point.
-                    while left and not ccw(free_point, tail[-1], left[-1]):
+                    # while left and not ccw(free_point, tail[-1], left[-1]):
+                    while left and not ccw(tail[-1], left[-1], free_point):
                         left.pop()
                     pass
 

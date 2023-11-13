@@ -71,8 +71,8 @@ def onclick(event):
         res = dcel.bfs(old_triangle_region, triangle_region)
         tmp, tmp2 = dcel.funnel(old_triangle_region, res, old_point, point)
         pres = dcel.presentable_form(res)
-        # for i in pres:
-        #     plt.plot(i['x'], i['y'], 'r-')
+        for i in pres:
+            plt.plot(i['x'], i['y'], 'r-')
         plt.plot(tmp2['x'], tmp2['y'], 'g-')
 
     # target_region = locator.locate(point)
@@ -80,7 +80,7 @@ def onclick(event):
     plt_y = [p.y for p in triangle_region.points]
     plt_x.append(plt_x[0])
     plt_y.append(plt_y[0])
-    # plt.plot(plt_x, plt_y, 'r-')
+    plt.plot(plt_x, plt_y, 'r-')
     plt.plot(ex, ey, 'k.')
     plt.show()
     pass
