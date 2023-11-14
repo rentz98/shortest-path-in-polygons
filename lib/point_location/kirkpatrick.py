@@ -35,13 +35,13 @@ class Locator(object):
                 """
 
                 bounding_tri = min_triangle.boundingTriangle(poly.points)
-                bounding_regions = spatial.triangulatePolygon(
+                bounding_regions = spatial.triangulate_polygon(
                     bounding_tri, hole=poly.points)
                 return bounding_tri, bounding_regions
 
             if not outline:
                 points = reduce(lambda ps, r: ps + r.points, regions, [])
-                outline = spatial.convexHull(points)
+                outline = spatial.convex_hull(points)
             return add_bounding_triangle(outline)
 
         def triangulate_regions(regions):
@@ -62,7 +62,7 @@ class Locator(object):
 
                 # If region is not a triangle, triangulate
                 if region.n > 3:
-                    triangles = spatial.triangulatePolygon(region)
+                    triangles = spatial.triangulate_polygon(region)
                     for triangle in triangles:
                         # Connect DAG
                         self.dag.add_node(triangle)
@@ -149,7 +149,7 @@ class Locator(object):
 
                 # triangulate hole
                 poly = calculate_bounding_polygon(p, affected_regions)
-                triangles = spatial.triangulatePolygon(poly)
+                triangles = spatial.triangulate_polygon(poly)
                 for triangle in triangles:
                     self.dag.add_node(triangle)
                     for j in affected_regions:

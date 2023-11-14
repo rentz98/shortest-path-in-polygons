@@ -1,21 +1,25 @@
-class DirectedGraph(object):
+class DirectedGraph:
 
     def __init__(self):
         self.e = {}
-        self.roots = set([])
+        self.roots = set()
 
     def contains(self, v):
+        """Returns True if v is the list of nodes."""
         return v in self.e
 
     def add_node(self, v):
-        self.e[v] = set([])
+        """Adds a node to the graph."""
+        self.e[v] = set()
         self.roots.add(v)
 
     def connect(self, u, v):
+        """Connects the two existing nodes u -> v."""
         self.e[u].add(v)
         self.roots.discard(v)
 
-    def acyclic(self):
+    def is_acyclic(self):
+        """Returns whether the graph has cycles."""
         # Copy data structures
         edges = {}
         for v in self.e:
@@ -25,12 +29,11 @@ class DirectedGraph(object):
         q = set([])
         for root in self.roots:
             q.add(root)
-        l = []
+
         while q:
             n = q.pop()
-            l.append(n)
             for m in self.e[n]:
-                if not m in edges[n]:
+                if m not in edges[n]:
                     continue
                 edges[n].remove(m)
 
@@ -49,9 +52,11 @@ class DirectedGraph(object):
         return True
 
     def neighbors(self, v):
+        """Returns the neighbors of the given node."""
         return self.e[v]
 
     def root(self):
+        """Returns one of the root nodes."""
         root = self.roots.pop()
         self.roots.add(root)
         return root
@@ -60,6 +65,7 @@ class DirectedGraph(object):
 class UndirectedGraph(DirectedGraph):
 
     def connect(self, u, v):
+        """Connects two existing nodes to one another."""
         self.e[u].add(v)
         self.e[v].add(u)
 

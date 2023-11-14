@@ -1,28 +1,28 @@
 from random import random
 from queue import Queue
 
-from lib.point_location.geo.shapes import Point
-from lib.point_location.geo.spatial import convexHull
+from lib.point_location.geo.shapes import Point, Polygon
+from lib.point_location.geo.spatial import convex_hull
 
 
-def randomPoint(k=None):
+def random_point(k=None):
     if k:
         return Point(int(k * random()), int(k * random()))
     return Point(random(), random())
 
 
-def randomConvexPolygon(sample, k=None, n=3):
-    hull = convexHull([randomPoint(k=k) for i in range(sample)])
+def random_convex_polygon(sample, k=None, n=3):
+    hull = convex_hull([random_point(k=k) for i in range(sample)])
     while hull.n < n:
-        hull = convexHull([randomPoint(k=k) for i in range(sample)])
+        hull = convex_hull([random_point(k=k) for i in range(sample)])
     return hull
 
 
-def randomTiling(polygon, n, CONCAVE=False):
+def random_tiling(polygon: Polygon, n: int, CONCAVE=False):
     """Generates a random concave tiling of a convex region."""
     class PolygonWithArea(object):
 
-        def __init__(self, polygon):
+        def __init__(self, polygon: Polygon):
             self.polygon = polygon
             self.area = polygon.area()
 
@@ -42,7 +42,7 @@ def randomTiling(polygon, n, CONCAVE=False):
         # Split up largest polygon
         polygon = pq.get().polygon
 
-        for polygon in polygon.split(INTERIOR=CONCAVE):
+        for polygon in polygon.split(interior=CONCAVE):
             if polygon.n == 3:
                 triangles.append(polygon)
             else:
@@ -56,8 +56,8 @@ def randomTiling(polygon, n, CONCAVE=False):
 
 
 def randomConcaveTiling(polygon, n=10):
-    return randomTiling(polygon, n=n, CONCAVE=True)
+    return random_tiling(polygon, n=n, CONCAVE=True)
 
 
 def randomConvexTiling(polygon, n=10):
-    return randomTiling(polygon, n)
+    return random_tiling(polygon, n)

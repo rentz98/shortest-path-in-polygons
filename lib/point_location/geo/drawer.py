@@ -6,7 +6,7 @@ def plotPoints(points, style='bo'):
     if not type(points) == list:
         points = [points]
 
-    points = spatial.toNumpy(points)
+    points = spatial.to_numpy(points)
     plt.plot(points[:, 0], points[:, 1], style)
 
 

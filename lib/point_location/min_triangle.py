@@ -1,8 +1,8 @@
 from math import sqrt, ceil, floor
 
 from lib.point_location.geo.shapes import Point, Line, Triangle, Polygon, ccw
-from lib.point_location.geo.spatial import convexHull
-from lib.point_location.geo.generator import randomConvexPolygon
+from lib.point_location.geo.spatial import convex_hull
+from lib.point_location.geo.generator import random_convex_polygon
 from lib.point_location.geo.drawer import plot, show
 
 
@@ -17,8 +17,8 @@ def minTriangle(poly):
 
         Returns: the triangle of minimum area enclosing polygon
     """
-    if not poly.isConvex():
-        poly = convexHull(poly.points)
+    if not poly.is_convex():
+        poly = convex_hull(poly.points)
 
     n = poly.n
     points = poly.points
@@ -65,7 +65,7 @@ def minTriangle(poly):
                 if not (midpoint.x <= max_x and midpoint.x >= min_x):
                     return False
 
-                if not s.atX(midpoint.x).close(midpoint):
+                if not s._at_x(midpoint.x).close(midpoint):
                     return False
 
                 return True
@@ -99,10 +99,10 @@ def minTriangle(poly):
                                   intersection.y - dist / ddist)
                 return guess
             else:
-                ddist = h(on.atX(intersection.x + 1), base)
-                guess = on.atX(intersection.x + dist / ddist)
+                ddist = h(on._at_x(intersection.x + 1), base)
+                guess = on._at_x(intersection.x + dist / ddist)
                 if ccw(base.p1, base.p2, guess) != ccw(base.p1, base.p2, point):
-                    guess = on.atX(intersection.x - dist / ddist)
+                    guess = on._at_x(intersection.x - dist / ddist)
                 return guess
 
         def critical(a, b, c, gamma_B):
@@ -253,7 +253,7 @@ def boundingTriangle(points):
     return expand(minTriangle(Polygon(points)))
 
 if __name__ == "__main__":
-    poly = randomConvexPolygon(10)
+    poly = random_convex_polygon(10)
     triangle = minTriangle(poly)
     plot(poly)
     show(triangle, style='r--')
