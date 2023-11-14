@@ -1,38 +1,47 @@
 from collections import deque
+from dataclasses import dataclass
 
 from lib.point_location.geo.shapes import Point, Triangle
 from lib.point_location.kirkpatrick import Locator
 from lib.point_location.geo.shapes import ccw
 
 
-
-def point_hash(p1: Point, p2: Point):
+def point_pair_hash(p1: Point, p2: Point):
+    """Returns the hash of two points"""
     return hash(hash(p1) + hash(p2))
 
 
-class DCEL_esque:
-    def __init__(self, triangles, locator: Locator):
+@dataclass()
+class TriangleInfo:
+    t: Triangle
+    edges: set[int]
+    neighbors: set[int]
+    pass
+
+
+class DCEL:
+    def __init__(self, triangles: list[Triangle], locator: Locator):
         self.locator = locator
-        self.triangles = dict()
-        self.edges = dict()
-        self.create_graph(triangles)
+        self.triangles: dict[int, TriangleInfo] = dict()
+        self.edges: dict[int, Edge] = dict()
+        self._create_graph(triangles)
         return
 
-    def create_graph(self, triangles):
+    def _create_graph(self, triangles: list[Triangle]):
         for t in triangles:
-            edges = []
-            neighbors = []
+            edges = set()
+            neighbors = set()
             this_triangle_hash = hash(t)
             for i in range(3):
-                hash_e = point_hash(t.points[i], t.points[(i + 1) % 3])
+                hash_e = point_pair_hash(t.points[i], t.points[(i + 1) % 3])
                 if hash_e not in self.edges.keys():
                     self.edges[hash_e] = Edge(t.points[i], t.points[(i + 1) % 3], this_triangle_hash)
                 else:
                     other_triangle_hash = self.edges[hash_e].add_triangle(t)
-                    neighbors.append(other_triangle_hash)
-                    self.triangles[other_triangle_hash]['neighbours'].append(this_triangle_hash)
-                edges.append(hash_e)
-            self.triangles[this_triangle_hash] = {'triangle': t, 'edges': edges, 'neighbours': neighbors}
+                    neighbors.add(other_triangle_hash)
+                    self.triangles[other_triangle_hash].neighbors.add(this_triangle_hash)
+                edges.add(hash_e)
+            self.triangles[this_triangle_hash] = TriangleInfo(t, edges, neighbors)
         return
 
     def bfs(self, p1_triangle:Triangle, p2_triangle:Triangle):
@@ -373,7 +382,7 @@ class Edge:
         return
 
     def __hash__(self):
-        return point_hash(self.p1, self.p2)
+        return point_pair_hash(self.p1, self.p2)
 
     def add_triangle(self, triangle):
         if len(self.triangles) > 1:
