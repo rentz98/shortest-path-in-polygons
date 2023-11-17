@@ -1,12 +1,13 @@
 from math import sqrt, ceil, floor
+from typing import Optional
 
-from lib.point_location.geo.shapes import Point, Line, Triangle, Polygon, ccw
-from lib.point_location.geo.spatial import convex_hull
-from lib.point_location.geo.generator import random_convex_polygon
-from lib.point_location.geo.drawer import plot, show
+from .geo.shapes import Point, Line, Triangle, Polygon, ccw
+from .geo.spatial import convex_hull
+# from .geo.generator import random_convex_polygon
+# from .geo.drawer import plot, show
 
 
-def minTriangle(poly):
+def min_bounding_triangle(poly: Polygon) -> Triangle:
     """
         Returns the triangle of minimum area enclosing a convex polygon.
         Runs in Theta(n) time for convex polygons, or O(n*log(n)) for
@@ -29,20 +30,21 @@ def minTriangle(poly):
     elif n == 3:
         return Triangle(poly.points[0], poly.points[1], poly.points[2])
 
-    def side(i):
-        """Return the side of polygon formed by vertices (i-1) and i."""
-        return Line(points[(i - 1) % n], points[i % n])
+    def side(idx: int) -> Line:
+        """Return the side of polygon formed by vertices (idx-1) and idx."""
+        return Line(points[(idx - 1) % n], points[idx % n])
 
-    def isValidTriangle(vertex_A, vertex_B, vertex_C, a, b, c):
+    def is_valid_triangle(vertex_a: Point, vertex_b: Point, vertex_c: Point,
+                          _a: int, _b: int, _c: int) -> bool:
         """Checks that a triangle composed of the given vertices is a valid local minimum."""
-        if not (vertex_A and vertex_B and vertex_C):
+        if not (vertex_a and vertex_b and vertex_c):
             return False
 
-        midpoint_A = Line(vertex_C, vertex_B).midpoint()
-        midpoint_B = Line(vertex_A, vertex_C).midpoint()
-        midpoint_C = Line(vertex_A, vertex_B).midpoint()
+        midpoint_a = Line(vertex_c, vertex_b).midpoint()
+        midpoint_b = Line(vertex_a, vertex_c).midpoint()
+        midpoint_c = Line(vertex_a, vertex_b).midpoint()
 
-        def validateMidpoint(midpoint, index):
+        def validate_midpoint(midpoint: Point, index: int) -> bool:
             """Checks that a midpoint touches the polygon on the appropriate side."""
             s = side(index)
 
@@ -54,7 +56,7 @@ def minTriangle(poly):
                     return False
                 max_y = max(s.p1.y, s.p2.y) + epsilon
                 min_y = min(s.p1.y, s.p2.y) - epsilon
-                if not (midpoint.y <= max_y and midpoint.y >= min_y):
+                if not (max_y >= midpoint.y >= min_y):
                     return False
 
                 return True
@@ -62,140 +64,143 @@ def minTriangle(poly):
                 max_x = max(s.p1.x, s.p2.x) + epsilon
                 min_x = min(s.p1.x, s.p2.x) - epsilon
                 # Must touch polygon
-                if not (midpoint.x <= max_x and midpoint.x >= min_x):
+                if not (max_x >= midpoint.x >= min_x):
                     return False
 
-                if not s._at_x(midpoint.x).close(midpoint):
+                if not s.at_x(midpoint.x).close(midpoint):
                     return False
 
                 return True
 
-        return (validateMidpoint(midpoint_A, a) and validateMidpoint(midpoint_B, b)
-                and validateMidpoint(midpoint_C, c))
+        return (validate_midpoint(midpoint_a, _a) and validate_midpoint(midpoint_b, _b)
+                and validate_midpoint(midpoint_c, _c))
 
-    def triangleForIndex(c, a, b):
-        """Returns the minimal triangle with edge C flush to vertex c."""
-        a = max(a, c + 1) % n
-        b = max(b, c + 2) % n
-        side_C = side(c)
+    def triangle_for_index(_c: int, _a: int, _b: int) -> tuple[Optional[Triangle], int, int]:
+        """Returns the minimal triangle with edge c flush to vertex c."""
+        _a = max(_a, _c + 1) % n
+        _b = max(_b, _c + 2) % n
+        side_c = side(_c)
 
-        def h(point, side):
+        def h(point: Point | int, _side: Line) -> float:
             """Return the distance from 'point' to 'side'."""
-            if type(point) == Point:
-                return side.distance(point)
+            if isinstance(point, Point):
+                return _side.distance(point)
             elif isinstance(point, int):
-                return side.distance(points[point])
+                return _side.distance(points[point])
 
-        def gamma(point, on, base):
+        def gamma(point: Point, on: Line, base: Line) -> Point:
             """Calculate the point on 'on' that is twice as far from 'base' as 'point'."""
             intersection = on.intersection(base)
             dist = 2 * h(point, base)
             # Calculate differential change in distance
             if on.vertical:
-                ddist = h(Point(intersection.x, intersection.y + 1), base)
-                guess = Point(intersection.x, intersection.y + dist / ddist)
+                d_dist = h(Point(intersection.x, intersection.y + 1), base)
+                guess = Point(intersection.x, intersection.y + dist / d_dist)
                 if ccw(base.p1, base.p2, guess) != ccw(base.p1, base.p2, point):
                     guess = Point(intersection.x,
-                                  intersection.y - dist / ddist)
+                                  intersection.y - dist / d_dist)
                 return guess
             else:
-                ddist = h(on._at_x(intersection.x + 1), base)
-                guess = on._at_x(intersection.x + dist / ddist)
+                d_dist = h(on.at_x(intersection.x + 1), base)
+                guess = on.at_x(intersection.x + dist / d_dist)
                 if ccw(base.p1, base.p2, guess) != ccw(base.p1, base.p2, point):
-                    guess = on._at_x(intersection.x - dist / ddist)
+                    guess = on.at_x(intersection.x - dist / d_dist)
                 return guess
 
-        def critical(a, b, c, gamma_B):
-            return ccw(gamma_B, points[b], points[(b - 1) % n]) == ccw(gamma_B, points[b], points[(b + 1) % n])
+        # def critical(b, gamma_B):
+        #     return ccw(gamma_B, points[b], points[(b - 1) % n]) == ccw(gamma_B, points[b], points[(b + 1) % n])
 
-        def high(a, b, c, gamma_B):
+        def high(__b: int, __gamma_b: Point) -> bool:
             # Test if two adjacent vertices are on same side of line (implies
             # tangency)
-            if ccw(gamma_B, points[b], points[(b - 1) % n]) == ccw(gamma_B, points[b], points[(b + 1) % n]):
+            if ccw(__gamma_b, points[__b], points[(__b - 1) % n]) ==\
+                    ccw(__gamma_b, points[__b], points[(__b + 1) % n]):
                 return False
 
             # Test if Gamma and B are on same side of line from adjacent
             # vertices
-            if ccw(points[(b - 1) % n], points[(b + 1) % n], gamma_B) == ccw(points[(b - 1) % n], points[(b + 1) % n], points[b]):
-                return h(gamma_B, side_C) > h(b, side_C)
-            else:
-                return False
+            if ccw(points[(__b - 1) % n], points[(__b + 1) % n], __gamma_b) ==\
+                    ccw(points[(__b - 1) % n], points[(__b + 1) % n], points[__b]):
+                return h(__gamma_b, side_c) > h(__b, side_c)
+            return False
 
-        def low(a, b, c, gamma_B):
+        def low(__b: int, __gamma_b: Point) -> bool:
             # Test if two adjacent vertices are on same side of line (implies
             # tangency)
-            if ccw(gamma_B, points[b], points[(b - 1) % n]) == ccw(gamma_B, points[b], points[(b + 1) % n]):
+            if ccw(__gamma_b, points[__b], points[(__b - 1) % n]) ==\
+                    ccw(__gamma_b, points[__b], points[(__b + 1) % n]):
                 return False
 
             # Test if Gamma and B are on same side of line from adjacent
             # vertices
-            if ccw(points[(b - 1) % n], points[(b + 1) % n], gamma_B) == ccw(points[(b - 1) % n], points[(b + 1) % n], points[b]):
+            if ccw(points[(__b - 1) % n], points[(__b + 1) % n], __gamma_b) ==\
+                    ccw(points[(__b - 1) % n], points[(__b + 1) % n], points[__b]):
                 return False
             else:
-                return h(gamma_B, side_C) > h(b, side_C)
+                return h(__gamma_b, side_c) > h(__b, side_c)
 
-        def onLeftChain(b):
-            return h((b + 1) % n, side_C) >= h(b, side_C)
+        def on_left_chain(__b: int) -> bool:
+            return h((__b + 1) % n, side_c) >= h(__b, side_c)
 
-        def incrementLowHigh(a, b, c):
-            gamma_A = gamma(points[a], side(a), side_C)
+        def increment_low_high(__a: int, __b: int, __c: int) -> tuple[int, int]:
+            _gamma_a = gamma(points[__a], side(__a), side_c)
 
-            if high(a, b, c, gamma_A):
-                b = (b + 1) % n
+            if high(__b, _gamma_a):
+                __b = (__b + 1) % n
             else:
-                a = (a + 1) % n
-            return a, b
+                __a = (__a + 1) % n
+            return __a, __b
 
-        def tangency(a, b):
-            gamma_B = gamma(points[b], side(a), side_C)
-            return h(b, side_C) >= h((a - 1) % n, side_C) and high(a, b, c, gamma_B)
+        def tangency(__a: int, __b: int):
+            _gamma_b = gamma(points[__b], side(__a), side_c)
+            return h(__b, side_c) >= h((__a - 1) % n, side_c) and high(__b, _gamma_b)
 
         # Increment b while low
-        while onLeftChain(b):
-            b = (b + 1) % n
+        while on_left_chain(_b):
+            _b = (_b + 1) % n
 
-        # Increment a if low, b if high
-        while h(b, side_C) > h(a, side_C):
-            a, b = incrementLowHigh(a, b, c)
+        # Increment _a if low, _b if high
+        while h(_b, side_c) > h(_a, side_c):
+            _a, _b = increment_low_high(_a, _b, _c)
 
         # Search for b tangency
-        while tangency(a, b):
-            b = (b + 1) % n
+        while tangency(_a, _b):
+            _b = (_b + 1) % n
 
-        gamma_B = gamma(points[b], side(a), side_C)
+        gamma_b = gamma(points[_b], side(_a), side_c)
         # Adjust if necessary
-        if low(a, b, c, gamma_B) or h(b, side_C) < h((a - 1) % n, side_C):
-            side_B = side(b)
-            side_A = side(a)
-            side_B = Line(side_C.intersection(side_B),
-                          side_A.intersection(side_B))
+        if low(_b, gamma_b) or h(_b, side_c) < h((_a - 1) % n, side_c):
+            side_b = side(_b)
+            side_a = side(_a)
+            side_b = Line(side_c.intersection(side_b),
+                          side_a.intersection(side_b))
 
-            if h(side_B.midpoint(), side_C) < h((a - 1) % n, side_C):
-                gamma_A = gamma(points[(a - 1) % n], side_B, side_C)
-                side_A = Line(gamma_A, points[(a - 1) % n])
+            if h(side_b.midpoint(), side_c) < h((_a - 1) % n, side_c):
+                gamma_a = gamma(points[(_a - 1) % n], side_b, side_c)
+                side_a = Line(gamma_a, points[(_a - 1) % n])
         else:
-            gamma_B = gamma(points[b], side(a), side_C)
-            side_B = Line(gamma_B, points[b])
-            side_A = Line(gamma_B, points[(a - 1) % n])
+            gamma_b = gamma(points[_b], side(_a), side_c)
+            side_b = Line(gamma_b, points[_b])
+            side_a = Line(gamma_b, points[(_a - 1) % n])
 
         # Calculate final intersections
-        vertex_A = side_C.intersection(side_B)
-        vertex_B = side_C.intersection(side_A)
-        vertex_C = side_A.intersection(side_B)
+        vertex_a = side_c.intersection(side_b)
+        vertex_b = side_c.intersection(side_a)
+        vertex_c = side_a.intersection(side_b)
 
         # Check if triangle is valid local minimum
-        if not isValidTriangle(vertex_A, vertex_B, vertex_C, a, b, c):
-            triangle = None
+        if not is_valid_triangle(vertex_a, vertex_b, vertex_c, _a, _b, _c):
+            _triangle = None
         else:
-            triangle = Triangle(vertex_A, vertex_B, vertex_C)
+            _triangle = Triangle(vertex_a, vertex_b, vertex_c)
 
-        return triangle, a, b
+        return _triangle, _a, _b
 
     triangles = []
     a = 1
     b = 2
     for i in range(n):
-        triangle, a, b = triangleForIndex(i, a, b)
+        triangle, a, b = triangle_for_index(i, a, b)
         if triangle:
             triangles.append(triangle)
 
@@ -203,57 +208,58 @@ def minTriangle(poly):
     return triangles[areas.index(min(areas))]
 
 
-def boundingTriangle(points):
-    def expand(poly, factor=10):
+def larger_bounding_triangle(points: list[Point], factor: int = 10) -> Polygon:
+    def expand(poly: Polygon, _factor: int) -> Polygon:
         """Expands a polygon, moving the vertices outward ~'factor'."""
-        def bisect(A, B, C):
+        def bisect(__a: Point, __b: Point, __c: Point) -> Point:
             # Define vector operations
-            def magnitude(v):
-                    return sqrt(sum([x * x for x in v]))
+            def magnitude(__v: list[float]) -> float:
+                return sqrt(sum([__x * __x for __x in __v]))
 
-            def normalize(v):
-                mag = magnitude(v)
-                return [x / mag for x in v]
+            def normalize(__v: list[float]) -> list[float]:
+                mag = magnitude(__v)
+                return [__x / mag for __x in __v]
 
-            def median(u, v):
-                return [(x[0] + x[1]) / 2 for x in zip(u, v)]
+            def median(__u: list[float], __v: list[float]):
+                return [(__x[0] + __x[1]) / 2 for __x in zip(__u, __v)]
 
-            def reverse(v):
-                return [-x for x in v]
+            def reverse(__v: list[float]):
+                return [-__x for __x in __v]
 
             # Form vectors
-            v_b = [B.x - A.x, B.y - A.y]
-            v_c = [C.x - A.x, C.y - A.y]
+            v_b = [__b.x - __a.x, __b.y - __a.y]
+            v_c = [__c.x - __a.x, __c.y - __a.y]
             v_b = normalize(v_b)
             v_c = normalize(v_c)
             bisector = reverse(median(v_b, v_c))
 
-            x = A.x + factor * bisector[0]
-            y = A.y + factor * bisector[1]
+            x = __a.x + _factor * bisector[0]
+            y = __a.y + _factor * bisector[1]
 
-            def absRound(n):
+            def abs_round(n: float) -> int:
                 if n < 0:
                     return floor(n)
                 return ceil(n)
 
-            x = absRound(x)
-            y = absRound(y)
+            x = abs_round(x)
+            y = abs_round(y)
 
             return Point(x, y)
 
-        def adjust(i):
-            A = poly.points[i % poly.n]
-            B = poly.points[(i - 1) % poly.n]
-            C = poly.points[(i + 1) % poly.n]
-            return bisect(A, B, C)
+        def adjust(i: int) -> Point:
+            __a = poly.points[i % poly.n]
+            __b = poly.points[(i - 1) % poly.n]
+            __c = poly.points[(i + 1) % poly.n]
+            return bisect(__a, __b, __c)
 
         expanded_points = [adjust(i) for i in range(poly.n)]
         return Polygon(expanded_points)
 
-    return expand(minTriangle(Polygon(points)))
+    return expand(min_bounding_triangle(Polygon(points)), factor)
 
-if __name__ == "__main__":
-    poly = random_convex_polygon(10)
-    triangle = minTriangle(poly)
-    plot(poly)
-    show(triangle, style='r--')
+
+# if __name__ == "__main__":
+#     _poly = random_convex_polygon(10)
+#     tri = min_triangle(_poly)
+#     plot(_poly)
+#     show(tri, style='r--')

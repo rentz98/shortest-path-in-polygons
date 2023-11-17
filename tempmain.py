@@ -57,7 +57,7 @@ def calc_path(p1: Point, p2: Point, region1: Triangle = None, region2: Triangle 
         return
 
     res = dcel.bfs(region1, region2)
-    tmp, tmp2 = dcel.funnel(region1, res, p1, p2)
+    tmp, tmp2 = dcel.funnel(res, p1, p2)
     pres = dcel.presentable_form(res)
     # for i in pres:
     #     plt.plot(i['x'], i['y'], 'r-')

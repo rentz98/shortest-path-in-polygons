@@ -1,5 +1,6 @@
 from collections import deque
 from dataclasses import dataclass
+from typing import Optional, Iterable
 
 from lib.point_location.geo.shapes import Point, Triangle
 from lib.point_location.kirkpatrick import Locator
@@ -11,9 +12,33 @@ def point_pair_hash(p1: Point, p2: Point):
     return hash(hash(p1) + hash(p2))
 
 
+def retrieve_path(graph: dict[int, Optional[int]], s: int) -> list[int]:
+    """Retrieves the path from the dictionary to list."""
+    node = s
+    path = []
+    while True:
+        if node not in graph:
+            return []
+
+        path.append(node)
+        if graph[node] is None:
+            return list(reversed(path))
+
+        node = graph[node]
+
+
+def find_common_element(l1: Iterable, l2: Iterable):
+    """Finds the common element in the two lists."""
+    for i in l1:
+        for j in l2:
+            if i == j:
+                return i
+    return None
+
+
 @dataclass()
 class TriangleInfo:
-    t: Triangle
+    triangle: Triangle
     edges: set[int]
     neighbors: set[int]
     pass
@@ -44,7 +69,11 @@ class DCEL:
             self.triangles[this_triangle_hash] = TriangleInfo(t, edges, neighbors)
         return
 
-    def bfs(self, p1_triangle:Triangle, p2_triangle:Triangle):
+    def bfs(self, p1_triangle: Triangle, p2_triangle: Triangle) -> list[int]:
+        """
+        Breadth First Search in order to find the shortest path from triangle p1 to p2.
+        Returns a list of the hashes of the triangles of the path.
+        """
         p1_hash = hash(p1_triangle)
         p2_hash = hash(p2_triangle)
 
@@ -58,76 +87,42 @@ class DCEL:
             s = queue.pop(0)
             # print('current triangle hash:', s)
 
+            # Reached the destination, retrieve the path.
             if s == p2_hash:
-                return self.retrive_path(traversal, s)
+                return retrieve_path(traversal, s)
 
-            for neighbour in graph[s]['neighbours']:
+            for neighbour in graph[s].neighbors:
                 if neighbour not in visited:
                     traversal[neighbour] = s
                     visited.append(neighbour)
                     queue.append(neighbour)
 
-    def retrive_path(self, graph, s):
-        node = s
-        path = []
-        while True:
-            if node not in graph:
-                return []
-
-            path.append(node)
-            if graph[node] is None:
-                return list(reversed(path))
-
-            node = graph[node]
-
-    def presentable_form(self, triangle_hashes):
+    def presentable_form(self, triangle_hashes: list[int]):
         triangles = []
         for h in triangle_hashes:
-            t = self.triangles[h]['triangle']
+            t = self.triangles[h].triangle
             triangles.append({'x': [p.x for p in t.points], 'y': [p.y for p in t.points]})
         return triangles
 
     def retrieve_triangles(self, triangle_hashes):
-        return [self.triangles[h]['triangle'] for h in triangle_hashes]
+        return [self.triangles[h].triangle for h in triangle_hashes]
 
-    def funnel(self, triangle_path, triangle_hashes, start: Point, end: Point):
-        # tail = []
-        # right = []
-        # left = []
-        #
-        # edges = []
-        # for i in range(len(triangle_hashes) - 1):
-        #     edge_hash = self.compare_lists(self.triangles[triangle_hashes[i]]['edges'],
-        #                                    self.triangles[triangle_hashes[i + 1]]['edges'])
-        #     edges.append(self.edges[edge_hash])
-        #
-        # tmp = []
-        # for e in edges:
-        #     tmp.append({'x': [e.p1.x, e.p2.x, e.p1.x], 'y': [e.p1.y, e.p2.y, e.p1.y]})
-        #
-        # tail.append(start)
-        #
-        # for edge in edges:
-        #     pl, pr = edge.p1, edge.p2
-        #     if not ccw(pl, tail[-1], pr):
-        #         pl, pr = pr, pl
-        #     if pl != left[-1]:
-        #         left.append(pl)
-        #     if pr != right[-1]:
-        #         left.append(pr)
-        #
-        # return tmp
+    def funnel(self, triangle_hashes: list[int], start: Point, end: Point):
+        """
+        Uses the funnel algorithm to get the shortest line that passes through the triangles
+        given in the triangle_hashes
+        """
 
+        # Get the edges that the shortest path goes through from the triangle hashes.
         edges = []
         for i in range(len(triangle_hashes) - 1):
-            edge_hash = self.compare_lists(self.triangles[triangle_hashes[i]]['edges'],
-                                           self.triangles[triangle_hashes[i + 1]]['edges'])
+            edge_hash = find_common_element(self.triangles[triangle_hashes[i]].edges,
+                                            self.triangles[triangle_hashes[i + 1]].edges)
             edges.append(self.edges[edge_hash])
 
-        tmp = []
+        passthrough_edges = []
         for e in edges:
-            tmp.append({'x': [e.p1.x, e.p2.x, e.p1.x], 'y': [e.p1.y, e.p2.y, e.p1.y]})
-
+            passthrough_edges.append({'x': [e.p1.x, e.p2.x], 'y': [e.p1.y, e.p2.y]})
 
         # First edge tunes the topology of the points
         pl, pr = edges[0].p1, edges[0].p2
@@ -136,53 +131,37 @@ class DCEL:
 
         prev_edge = edges.pop(0)
 
-        tail = deque((start,))
-        left = deque((pl,))
-        right = deque((pr,))
+        tail = deque((start,))  # The nodes guaranteed to be in the shortest path.
+        left = deque((pl,))     # The nodes that restrict the path from the left.
+        right = deque((pr,))    # The nodes that restrict the path from the right.
 
-        def finish_it():
-            # while left or right:
-            #     if left:
-            #         item = left.popleft()
-            #         if ccw(tail[-1], item, end):
-            #             tail.append(item)
-            #     if right:
-            #         item = right.popleft()
-            #         if ccw(end, item, tail[-1]):
-            #             tail.append(item)
+        def finalize():
+            """Create the end result to return."""
 
+            # The order to investigate the remaining nodes
             if right and right[0] in tail:
-                lists = [right, left]
+                queues = [right, left]
             else:
-                lists = [left, right]
+                queues = [left, right]
 
-            for l in lists:
-                while l:
-                    item = l.popleft()
-                    if (l is left):
+            for q in queues:
+                while q:
+                    item = q.popleft()
+                    if q is left:
                         if ccw(tail[-1], item, end):
                             tail.append(item)
                     else:
                         if ccw(end, item, tail[-1]):
                             tail.append(item)
-            # while left:
-            #     item = left.popleft()
-            #     if ccw(tail[-1], item, end):
-            #         tail.append(item)
-            # while right:
-            #     item = right.popleft()
-            #     if ccw(end, item, tail[-1]):
-            #         tail.append(item)
+
             tail.append(end)
 
-            tmp2 = {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
-            return tmp2
+            return {'x': [p.x for p in tail], 'y': [p.y for p in tail]}
 
         print("\noperation 0")
 
         # Each subsequent edge will have a common point
         for edge in edges:
-
 
             # Get the points of the last edge.
             last_points = [prev_edge.p1, prev_edge.p2]
@@ -296,80 +275,14 @@ class DCEL:
                 raise ValueError("No common bound point.")
                 pass
 
-
-
-            # if left and bound_point == left[-1]:
-            #     if not right:
-            #         right = [free_point]
-            #     elif not ccw(left[0], tail[-1], free_point):
-            #         # Crossing -> add to tail
-            #         print("operation right.cross")
-            #         while left and not ccw(left[0], tail[-1], free_point):
-            #             tail.append(left.pop(0))
-            #         right = [free_point]
-            #     elif ccw(right[-1], tail[-1], free_point):
-            #         # widening -> add to left list
-            #         print("operation right.wide")
-            #         right.append(free_point)
-            #     else:
-            #         # narrowing -> check list for inconsistencies
-            #         while right and ccw(free_point, tail[-1], right[-1]):
-            #             right.pop(-1)
-            #         right.append(free_point)
-            #         print("operation left.narrow")
-            # elif right and bound_point == right[-1]:
-            #     if not left:
-            #         left = [free_point]
-            #     elif not right or not ccw(free_point, tail[-1], right[0]):
-            #         # Crossing -> add to tail
-            #         print("operation left.cross")
-            #         while right and not ccw(free_point, tail[-1], right[0]):
-            #             tail.append(right.pop(0))
-            #         left = [free_point]
-            #     elif ccw(free_point, tail[-1], left[-1]):
-            #         # widening -> add to left list
-            #         print("operation left.wide")
-            #         left.append(free_point)
-            #     else:
-            #         # narrowing -> check list for inconsistencies
-            #         while left and ccw(left[-1], tail[-1], free_point):
-            #             left.pop(-1)
-            #         left.append(free_point)
-            #         print("operation left.narrow")
-            # else:
-            #     raise ValueError("sjkadha")
-
             # Update the previous edge
             prev_edge = edge
 
-            # End for each edge in edges.
+            # End of for each edge in edges.
             pass
 
-
-        return tmp, finish_it()
-
-    def funny_funnel(self, triangle_path, triangle_hashes: list[str], start: Point, end: Point):
-        # Get the edge list
-        edges = []
-        for i in range(len(triangle_hashes) - 1):
-            edge_hash = self.compare_lists(self.triangles[triangle_hashes[i]]['edges'],
-                                           self.triangles[triangle_hashes[i + 1]]['edges'])
-            edges.append(self.edges[edge_hash])
-            pass
-
-        # First edge tunes the topology of the points
-        pl, pr = edges[0].p1, edges[0].p2
-        if not ccw(pl, start, pr):
-            pl, pr = pr, pl
-
-        return
-
-    def compare_lists(self, l1, l2):
-        for i in l1:
-            for j in l2:
-                if i == j:
-                    return i
-        return None
+        return passthrough_edges, finalize()
+    pass
 
 
 class Edge:

@@ -1,8 +1,13 @@
 from random import random
 from math import sqrt
 from typing import Optional
+from abc import ABC, abstractmethod
 
-from .spatial import triangulate_polygon
+from itertools import chain
+from copy import deepcopy
+# from .spatial import triangulate_polygon
+
+from lib.triangulation.earcut import earcut
 
 
 class Point(object):
@@ -85,7 +90,7 @@ class Line:
 
         return self.slope == other.slope and self.intercept == other.intercept
 
-    def _at_x(self, x: float) -> Optional[Point]:
+    def at_x(self, x: float) -> Optional[Point]:
         """Returns the point in the line at with the given value as the x part."""
         if self.vertical:
             return None
@@ -114,12 +119,12 @@ class Line:
             return None
 
         if self.vertical:
-            return other._at_x(self.p1.x)
+            return other.at_x(self.p1.x)
         elif other.vertical:
-            return self._at_x(other.p1.x)
+            return self.at_x(other.p1.x)
 
         x = float(self.intercept - other.intercept) / (other.slope - self.slope)
-        return self._at_x(x)
+        return self.at_x(x)
 
     def midpoint(self) -> Point:
         """Returns the midpoint of the line segment."""
@@ -128,7 +133,7 @@ class Line:
         return Point(x, y)
 
 
-class Polygon:
+class Shape2d(ABC):
 
     def __init__(self, points: list[Point]):
         if len(points) < 3:
@@ -136,6 +141,71 @@ class Polygon:
 
         self.points = points
         self.n = len(points)
+        pass
+
+    @abstractmethod
+    def contains_point(self, point: Point) -> bool:
+        pass
+
+    def _convex_contains_point(self, p: Point) -> bool:
+        # If convex, use CCW-esque algorithm
+        is_inside = False
+
+        p1 = self.points[0]
+        for i in range(self.n + 1):
+            p2 = self.points[i % self.n]
+            if p.y > min(p1.y, p2.y):
+                if p.y <= max(p1.y, p2.y):
+                    if p.x <= max(p1.x, p2.x):
+                        x_ints = float('-inf')
+                        if p1.y != p2.y:
+                            x_ints = (p.y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y) + p1.x
+                        if p1.x == p2.x or p.x <= x_ints:
+                            is_inside = not is_inside
+            p1 = p2
+        return is_inside
+    pass
+
+
+class Triangle(Shape2d):
+
+    def __init__(self, a: Point, b: Point, c: Point):
+        self.a = a
+        self.b = b
+        self.c = c
+        super(Triangle, self).__init__([a, b, c])
+
+    def area(self) -> float:
+        a = self.a
+        b = self.b
+        c = self.c
+        return (abs((b.x * a.y - a.x * b.y)
+                    + (c.x * b.y - b.x * c.y)
+                    + (a.x * c.y - c.x * a.y)) / 2.0)
+
+    def interior_point(self):
+        # Different and faster way to compute a random interior point.
+        a = self.a
+        b = self.b
+        c = self.c
+        r1 = random()
+        r2 = random()
+        return (1 - sqrt(r1)) * a + sqrt(r1) * (1 - r2) * b + r2 * sqrt(r1) * c
+
+    def contains_point(self, point: Point) -> bool:
+        return self._convex_contains_point(point)
+    pass
+
+
+class Polygon(Shape2d):
+
+    def __init__(self, points: list[Point]):
+        if len(points) < 3:
+            raise ValueError("Polygon must have at least three vertices.")
+
+        self._triangulation: Optional[list[Triangle]] = None
+        self.hole: Optional[list[Point]] = None
+        super(Polygon, self).__init__(points)
 
     def __str__(self) -> str:
         s = ""
@@ -148,31 +218,40 @@ class Polygon:
     def __hash__(self):
         return hash(tuple(sorted(self.points, key=lambda p: p.x)))
 
-    def contains(self, p: Point) -> bool:
+    @property
+    def triangulation(self) -> list[Triangle]:
+        if self._triangulation:
+            return self._triangulation
+        return self.triangulate_polygon(self.hole)
+
+    def triangulate_polygon(self, hole: list[Point] = None) -> list[Triangle]:
+        """Triangulates a polygon with up to one hole."""
+        points_tuples = list(chain.from_iterable((p.x, p.y) for p in self.points))
+        poly_points = deepcopy(self.points)
+        hole_start_idx = None
+
+        if hole:
+            hole_start_idx = [len(points_tuples) // 2]
+            poly_points += hole
+            points_tuples += list(chain.from_iterable((p.x, p.y) for p in hole))
+
+        triangles = earcut(points_tuples, hole_start_idx, 2)
+
+        self._triangulation = [Triangle(poly_points[triangles[3 * i + 0]],
+                               poly_points[triangles[3 * i + 1]],
+                               poly_points[triangles[3 * i + 2]])
+                               for i in range(len(triangles) // 3)]
+        return self._triangulation
+
+    def contains_point(self, p: Point) -> bool:
         """Returns True if p is inside the Polygon."""
         if self.is_convex():
-            # If convex, use CCW-esque algorithm
-            inside = False
-
-            p1 = self.points[0]
-            for i in range(self.n + 1):
-                p2 = self.points[i % self.n]
-                if p.y > min(p1.y, p2.y):
-                    if p.y <= max(p1.y, p2.y):
-                        if p.x <= max(p1.x, p2.x):
-                            x_ints = float('-inf')
-                            if p1.y != p2.y:
-                                x_ints = (p.y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y) + p1.x
-                            if p1.x == p2.x or p.x <= x_ints:
-                                inside = not inside
-                p1 = p2
-
-            return inside
+            return self._convex_contains_point(p)
         else:
             # If concave, must triangulate and check individual triangles
-            triangles = triangulate_polygon(self)
+            triangles = self.triangulation
             for triangle in triangles:
-                if triangle.contains(p):
+                if triangle.contains_point(p):
                     return True
             return False
 
@@ -276,7 +355,7 @@ class Polygon:
 
     def area(self) -> float:
         """Returns the area of the polygon."""
-        triangles = triangulate_polygon(self)
+        triangles = self.triangulation
         areas = [t.area() for t in triangles]
         return sum(areas)
 
@@ -294,7 +373,7 @@ class Polygon:
             return min_y + random() * (max_y - min_y)
 
         p = Point(x(), y())
-        while not self.contains(p):
+        while not self.contains_point(p):
             p = Point(x(), y())
 
         return p
@@ -316,14 +395,14 @@ class Polygon:
             return min_y + random() * (max_y - min_y) + off()
 
         p = Point(x(), y())
-        while self.contains(p):
+        while self.contains_point(p):
             p = Point(x(), y())
 
         return p
 
     def smart_interior_point(self):
         """Returns a random interior point via triangulation."""
-        triangles = triangulate_polygon(self)
+        triangles = self.triangulation
         areas = [t.area() for t in triangles]
         total = sum(areas)
         probabilities = [area / total for area in areas]
@@ -336,25 +415,7 @@ class Polygon:
             if count >= r:
                 return triangle.interior_point()
 
-
-class Triangle(Polygon):
-
-    def __init__(self, a: Point, b: Point, c: Point):
-        super().__init__([a, b, c])
-
-    def area(self) -> float:
-        a = self.points[0]
-        b = self.points[1]
-        c = self.points[2]
-        return (abs((b.x * a.y - a.x * b.y)
-                    + (c.x * b.y - b.x * c.y)
-                    + (a.x * c.y - c.x * a.y)) / 2.0)
-
-    def interior_point(self):
-        # Different and faster way to compute a random interior point.
-        a = self.points[0]
-        b = self.points[1]
-        c = self.points[2]
-        r1 = random()
-        r2 = random()
-        return (1 - sqrt(r1)) * a + sqrt(r1) * (1 - r2) * b + r2 * sqrt(r1) * c
+    def to_triangle(self) -> Optional[Triangle]:
+        if self.n == 3:
+            return Triangle(*self.points)
+    pass

@@ -2,7 +2,7 @@ from . import spatial
 import matplotlib.pyplot as plt
 
 
-def plotPoints(points, style='bo'):
+def plot_points(points, style='bo'):
     if not type(points) == list:
         points = [points]
 
@@ -10,8 +10,8 @@ def plotPoints(points, style='bo'):
     plt.plot(points[:, 0], points[:, 1], style)
 
 
-def showPoints(points, style='bo'):
-    plotPoints(points, style=style)
+def show_points(points, style='bo'):
+    plot_points(points, style=style)
     plt.show()
 
 
@@ -20,7 +20,7 @@ def plot(polygons, style='g-'):
         polygons = [polygons]
     for polygon in polygons:
         points = polygon.points + [polygon.points[0]]
-        plotPoints(points, style=style)
+        plot_points(points, style=style)
 
 
 def show(polygons, style='g-'):

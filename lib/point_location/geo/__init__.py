@@ -1,1 +1,1 @@
-#!/usr/bin/env pythonimport lib.point_location.geo.shapes
+#!/usr/bin/env pythonfrom lib.point_location.geo.shapes import Point
