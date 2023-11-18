@@ -1,7 +1,7 @@
 from collections import deque
 
 from lib.point_location.geo.shapes import Point
-from lib.point_location.kirkpatrick import Locator
+from lib.point_location.kirkpatrick import SinglePolygonLocator
 from lib.point_location.geo.shapes import ccw
 
 
@@ -11,7 +11,7 @@ def point_hash(p1: Point, p2: Point):
 
 
 class DCEL_esque:
-    def __init__(self, triangles, locator: Locator):
+    def __init__(self, triangles, locator: SinglePolygonLocator):
         self.locator = locator
         self.triangles = dict()
         self.edges = dict()

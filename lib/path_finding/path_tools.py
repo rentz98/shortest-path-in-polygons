@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, Iterable
 
 from lib.point_location.geo.shapes import Point, Triangle
-from lib.point_location.kirkpatrick import Locator
+from lib.point_location.kirkpatrick import SinglePolygonLocator
 from lib.point_location.geo.shapes import ccw
 
 
@@ -45,7 +45,7 @@ class TriangleInfo:
 
 
 class DCEL:
-    def __init__(self, triangles: list[Triangle], locator: Locator):
+    def __init__(self, triangles: list[Triangle], locator: SinglePolygonLocator):
         self.locator = locator
         self.triangles: dict[int, TriangleInfo] = dict()
         self.edges: dict[int, Edge] = dict()

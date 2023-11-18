@@ -8,7 +8,7 @@ from . import min_triangle
 from lib.point_location.geo.graph import UndirectedGraph, DirectedGraph
 
 
-class Locator(object):
+class SinglePolygonLocator:
 
     def __init__(self, regions: list[Triangle], outline=None):
         self._preprocess(regions, outline)
@@ -63,24 +63,29 @@ class Locator(object):
 
             for region in __regions:
                 self.dag.add_node(region)
-
-                # If region is not a triangle, triangulate
-                if region.n > 3 and isinstance(region, Polygon):
-                    triangles = region.triangulation
-                    for triangle in triangles:
-                        # Connect DAG
-                        self.dag.add_node(triangle)
-                        self.dag.connect(triangle, region)
-                        # Add to frontier
-                        __frontier.append(triangle)
-                elif isinstance(region, Polygon):
-                    if tri := region.to_triangle():
-                        __frontier.append(tri)
+                
+                if region.n < 3:
+                    raise ValueError(f"Region with points: {region.points} has
+                                     less than 3 points.")
+                
+                if isinstance(region, Polygon):
+                    # If region is not a triangle, triangulate
+                    if region.n > 3:
+                        triangles = region.triangulation
+                        for triangle in triangles:
+                            # Connect DAG
+                            self.dag.add_node(triangle)
+                            self.dag.connect(triangle, region)
+                            # Add to frontier
+                            __frontier.append(triangle)
                     else:
-                        raise ValueError(f"Region with points: {region.points} cannot be "
-                                         f"converted to a triangle.")
-                else:
+                        if tri := region.to_triangle():
+                            __frontier.append(tri)
+                elif region.n == 3 and isinstance(region, Triangle):
                     __frontier.append(region)
+                else:
+                    raise ValueError(f"Region with points: {region.points} cannot be "
+                                     f"converted to a triangle.")
 
             return __frontier
 
@@ -221,3 +226,13 @@ class Locator(object):
         # Is the final region an exterior region?
         return curr, curr in self.regions
     pass
+
+
+class MultiPolygonLocator:
+    def __init__(self) -> None:
+        self.locators = list()
+        self.all_triangles: dict[int, Triangle] = dict()
+        pass
+    
+    # def add_region(self, triangulation: list[Triangle], outline_polygon: Polygon = None):
+    #     for triangle in 

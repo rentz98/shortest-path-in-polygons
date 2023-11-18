@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from lib.triangulation.earcut import flatten, earcut, deviation
 from lib.point_location.geo.shapes import Point, Polygon, Triangle
-from lib.point_location.kirkpatrick import Locator
+from lib.point_location.kirkpatrick import SinglePolygonLocator
 from lib.path_finding.path_tools import DCEL
 
 fig = plt.figure()
@@ -41,7 +41,7 @@ triangles_points = [[poly_points[tri[3*i + 0]], poly_points[tri[3*i + 1]], poly_
 outline_points = poly_points + [poly_points[0]]
 outline_polygon = Polygon(poly_points)
 triangles_polygon = [Triangle(*p) for p in triangles_points]
-locator = Locator(regions=triangles_polygon, outline=outline_polygon)
+locator = SinglePolygonLocator(regions=triangles_polygon, outline=outline_polygon)
 
 dcel = DCEL(triangles_polygon, locator)
 
