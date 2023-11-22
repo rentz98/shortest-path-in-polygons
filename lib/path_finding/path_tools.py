@@ -121,6 +121,9 @@ class DCEL:
         passthrough_edges = []
         for e in edges:
             passthrough_edges.append({'x': [e.p1.x, e.p2.x], 'y': [e.p1.y, e.p2.y]})
+        
+        if not passthrough_edges:
+            return {'x': [start.x, end.x], 'y': [start.y, end.y]}
 
         # First edge tunes the topology of the points
         pl, pr = edges[0].p1, edges[0].p2

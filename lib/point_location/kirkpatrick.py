@@ -276,7 +276,7 @@ class SinglePolygonLocator:
         if (tri_path := self.dcel.bfs(self.__starting_triangle, tri)) is None:
             return None
 
-        _, res = self.dcel.funnel(tri_path, self.__starting_point, end_point)
+        res = self.dcel.funnel(tri_path, self.__starting_point, end_point)
 
         self.__starting_triangle = None
         self.__starting_point = None
