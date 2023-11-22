@@ -43,7 +43,7 @@ outline_polygon = Polygon(poly_points)
 triangles_polygon = [Triangle(*p) for p in triangles_points]
 locator = SinglePolygonLocator(regions=triangles_polygon, outline=outline_polygon)
 
-dcel = DCEL(triangles_polygon, locator)
+dcel = DCEL(triangles_polygon)
 
 
 def calc_path(p1: Point, p2: Point, region1: Triangle = None, region2: Triangle = None):

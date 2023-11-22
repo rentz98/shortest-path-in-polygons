@@ -1,13 +1,13 @@
 from math import sqrt, ceil, floor
 from typing import Optional
 
-from .geo.shapes import Point, Line, Triangle, Polygon, ccw
+from .geo.shapes import Point, Line, Triangle, Polygon, ccw, Shape2d
 from .geo.spatial import convex_hull
 # from .geo.generator import random_convex_polygon
 # from .geo.drawer import plot, show
 
 
-def min_bounding_triangle(poly: Polygon) -> Triangle:
+def min_bounding_triangle(poly: Polygon) -> Optional[Triangle]:
     """
         Returns the triangle of minimum area enclosing a convex polygon.
         Runs in Theta(n) time for convex polygons, or O(n*log(n)) for
@@ -40,6 +40,9 @@ def min_bounding_triangle(poly: Polygon) -> Triangle:
         if not (vertex_a and vertex_b and vertex_c):
             return False
 
+        if vertex_a.close_to(vertex_b) or vertex_a.close_to(vertex_c) or vertex_b.close_to(vertex_c):
+            return False
+
         midpoint_a = Line(vertex_c, vertex_b).midpoint()
         midpoint_b = Line(vertex_a, vertex_c).midpoint()
         midpoint_c = Line(vertex_a, vertex_b).midpoint()
@@ -67,7 +70,7 @@ def min_bounding_triangle(poly: Polygon) -> Triangle:
                 if not (max_x >= midpoint.x >= min_x):
                     return False
 
-                if not s.at_x(midpoint.x).close(midpoint):
+                if not s.at_x(midpoint.x).close_to(midpoint):
                     return False
 
                 return True
@@ -204,12 +207,15 @@ def min_bounding_triangle(poly: Polygon) -> Triangle:
         if triangle:
             triangles.append(triangle)
 
+    if not triangles:
+        return None
+
     areas = [triangle.area() for triangle in triangles]
     return triangles[areas.index(min(areas))]
 
 
-def larger_bounding_triangle(points: list[Point], factor: int = 10) -> Polygon:
-    def expand(poly: Polygon, _factor: int) -> Polygon:
+def larger_bounding_triangle(points: list[Point], factor: int = 10) -> Optional[Polygon]:
+    def expand(poly: Shape2d, _factor: int) -> Polygon:
         """Expands a polygon, moving the vertices outward ~'factor'."""
         def bisect(__a: Point, __b: Point, __c: Point) -> Point:
             # Define vector operations
@@ -255,7 +261,11 @@ def larger_bounding_triangle(points: list[Point], factor: int = 10) -> Polygon:
         expanded_points = [adjust(i) for i in range(poly.n)]
         return Polygon(expanded_points)
 
-    return expand(min_bounding_triangle(Polygon(points)), factor)
+    tri = min_bounding_triangle(Polygon(points))
+    if not tri:
+        return None
+
+    return expand(tri, factor)
 
 
 # if __name__ == "__main__":

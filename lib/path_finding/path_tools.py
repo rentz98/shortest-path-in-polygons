@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Optional, Iterable
 
 from lib.point_location.geo.shapes import Point, Triangle
-from lib.point_location.kirkpatrick import SinglePolygonLocator
 from lib.point_location.geo.shapes import ccw
 
 
@@ -45,14 +44,13 @@ class TriangleInfo:
 
 
 class DCEL:
-    def __init__(self, triangles: list[Triangle], locator: SinglePolygonLocator):
-        self.locator = locator
+    def __init__(self, triangles: Iterable[Triangle]):
         self.triangles: dict[int, TriangleInfo] = dict()
         self.edges: dict[int, Edge] = dict()
         self._create_graph(triangles)
         return
 
-    def _create_graph(self, triangles: list[Triangle]):
+    def _create_graph(self, triangles: Iterable[Triangle]):
         for t in triangles:
             edges = set()
             neighbors = set()

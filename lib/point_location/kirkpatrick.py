@@ -1,17 +1,26 @@
 from functools import reduce
-from typing import Optional
+from typing import Optional, Iterable
 
 # from lib.point_location.geo import spatial
 from lib.point_location.geo.spatial import convex_hull
 from lib.point_location.geo.shapes import Point, Polygon, Triangle, Shape2d
 from . import min_triangle
 from lib.point_location.geo.graph import UndirectedGraph, DirectedGraph
+from lib.path_finding.path_tools import DCEL
+
+
+class BoundingTriangleCreationError(Exception):
+    pass
 
 
 class SinglePolygonLocator:
 
     def __init__(self, regions: list[Triangle], outline=None):
+        self.triangles: dict[int, Triangle] = {hash(t): t for t in regions}
+        self.dcel = DCEL(regions)
         self._preprocess(regions, outline)
+        self.__starting_point = None
+        self.__starting_triangle = None
 
     def _preprocess(self, regions: list[Triangle], outline=None):
         def process_boundary(__regions: list[Triangle], __outline=None):
@@ -38,6 +47,8 @@ class SinglePolygonLocator:
                 """
 
                 bounding_tri = min_triangle.larger_bounding_triangle(poly.points)
+                if not bounding_tri:
+                    return None, []
                 bounding_regions = bounding_tri.triangulate_polygon(poly.points)
                 # bounding_regions = spatial.triangulate_polygon(
                 #     bounding_tri, hole=poly.points)
@@ -65,8 +76,8 @@ class SinglePolygonLocator:
                 self.dag.add_node(region)
                 
                 if region.n < 3:
-                    raise ValueError(f"Region with points: {region.points} has
-                                     less than 3 points.")
+                    raise ValueError(f"Region with points: {region.points} has "
+                                     f"less than 3 points.")
                 
                 if isinstance(region, Polygon):
                     # If region is not a triangle, triangulate
@@ -184,6 +195,8 @@ class SinglePolygonLocator:
 
         # Calculate, triangulate bounding triangle
         bounding_triangle, boundary = process_boundary(regions, outline)
+        if bounding_triangle is None:
+            raise BoundingTriangleCreationError("Could not calculate the bounding triangle.")
 
         # Store copy of boundary
         self.boundary = boundary
@@ -225,14 +238,140 @@ class SinglePolygonLocator:
 
         # Is the final region an exterior region?
         return curr, curr in self.regions
+
+    def find_path(self, tri_1: Triangle, tri_2: Triangle) -> Optional[list[int]]:
+        if not (hash(tri_1) in self.triangles and hash(tri_2) in self.triangles):
+            return None
+        return self.dcel.bfs(tri_1, tri_2)
+
+    def funnel(self, triangle_hashes: list[int], start: Point, end: Point):
+        return self.dcel.funnel(triangle_hashes, start, end)
+
+    def set_first_point(self, point: Point, triangle: Triangle = None):
+        if triangle is not None:
+            if triangle.contains_point(point):
+                self.__starting_point = point
+                self.__starting_triangle = triangle
+                return True
+
+            self.__starting_triangle = None
+            self.__starting_point = None
+            return False
+
+        if (tri := self.locate(point)) is not None:
+            self.__starting_triangle = tri
+            self.__starting_point = point
+            return True
+
+        self.__starting_triangle = None
+        self.__starting_point = None
+        return False
+
+    def get_shortest_path(self, end_point: Point):
+        if self.__starting_point is None:
+            return None
+        if (tri := self.locate(end_point)) is None:
+            return None
+
+        if (tri_path := self.dcel.bfs(self.__starting_triangle, tri)) is None:
+            return None
+
+        _, res = self.dcel.funnel(tri_path, self.__starting_point, end_point)
+
+        self.__starting_triangle = None
+        self.__starting_point = None
+        return res
+
     pass
 
 
 class MultiPolygonLocator:
     def __init__(self) -> None:
-        self.locators = list()
+        self.locators = set()
         self.all_triangles: dict[int, Triangle] = dict()
+        self.triangle_owners: dict[int, SinglePolygonLocator] = dict()
+
+        self.__starting_point = None
+        self.__starting_triangle = None
+        self.__current_locator = None
         pass
     
     # def add_region(self, triangulation: list[Triangle], outline_polygon: Polygon = None):
     #     for triangle in 
+    
+    def add_regions(self, region_outlines: Iterable[Polygon]) -> Optional[set[int]]:
+        """Adds the regions to the class. Returns the indexes of the regions that were skipped."""
+        tri_triangles = {**self.all_triangles}
+        tri_locators = {**self.triangle_owners}
+
+        skipped = set()
+        for i, region in enumerate(region_outlines):
+
+            triangulation = region.triangulation
+            try:
+                locator = SinglePolygonLocator(triangulation, region)
+            except BoundingTriangleCreationError:
+                skipped.add(i)
+                continue
+            for triangle in triangulation:
+                if (h := hash(triangle)) in tri_triangles:
+                    # Triangle already in the list -> problem -> ignore region or all regions
+                    return None
+                tri_triangles[h] = triangle
+                tri_locators[h] = locator
+            else:
+                self.locators.add(locator)
+            pass
+
+        self.all_triangles = tri_triangles
+        self.triangle_owners = tri_locators
+        return skipped
+
+    def locate(self, p: Point, previous_triangle: Triangle = None) -> Optional[Triangle]:
+        if previous_triangle is not None:
+            if (locator := self.triangle_owners.get(hash(previous_triangle))) is None:
+                return None
+            return locator.locate(p)
+        for locator in self.locators:
+            if (triangle := locator.locate(p)) is not None:
+                return triangle
+        return None
+
+    def set_first_point(self, point: Point) -> bool:
+
+        self.__starting_point = None
+        self.__starting_triangle = None
+        self.__current_locator = None
+
+        if (tri := self.locate(point)) is None:
+            return False
+        h = hash(tri)
+        locator = self.triangle_owners[h]
+
+        if locator.set_first_point(point, tri):
+            self.__starting_point = point
+            self.__starting_triangle = tri
+            self.__current_locator = locator
+            return True
+        return False
+
+    def has_first_point(self):
+        return not not self.__starting_point
+
+    def get_shortest_path(self, end_point: Point):
+        if (tri := self.locate(end_point)) is None:
+            return None
+
+        h = hash(tri)
+        locator = self.triangle_owners[h]
+
+        if locator is not self.__current_locator:
+            return None
+
+        self.__starting_point = None
+        self.__starting_triangle = None
+        self.__current_locator = None
+
+        return locator.get_shortest_path(end_point)
+    pass
+        

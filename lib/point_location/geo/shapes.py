@@ -31,7 +31,10 @@ class Point(object):
     def __rmul__(self, c):
         return Point(c * self.x, c * self.y)
 
-    def close(self, other, epsilon=0.01):
+    def __sub__(self, other):
+        return Point(self.x - other.x, self.y - other.y)
+
+    def close_to(self, other, epsilon=0.01):
         return self.dist(other) < epsilon
 
     def dist(self, other):
@@ -141,7 +144,36 @@ class Shape2d(ABC):
 
         self.points = points
         self.n = len(points)
+        self.__hash = None
         pass
+
+    def __str__(self) -> str:
+        s = ""
+        for point in self.points:
+            if s:
+                s += " -> "
+            s += str(point)
+        return s
+
+    def __hash__(self):
+        return self.hash
+
+    @property
+    def hash(self):
+        if self.__hash:
+            return self.__hash
+        return hash(tuple(sorted(self.points, key=lambda p: p.x)))
+
+    def reset_hash(self):
+        self.__hash = None
+
+    @property
+    def x(self) -> list[float]:
+        return [p.x for p in self.points] + [self.points[0].x]
+
+    @property
+    def y(self) -> list[float]:
+        return [p.y for p in self.points] + [self.points[0].y]
 
     @abstractmethod
     def contains_point(self, point: Point) -> bool:
@@ -206,17 +238,6 @@ class Polygon(Shape2d):
         self._triangulation: Optional[list[Triangle]] = None
         self.hole: Optional[list[Point]] = None
         super(Polygon, self).__init__(points)
-
-    def __str__(self) -> str:
-        s = ""
-        for point in self.points:
-            if s:
-                s += " -> "
-            s += str(point)
-        return s
-
-    def __hash__(self):
-        return hash(tuple(sorted(self.points, key=lambda p: p.x)))
 
     @property
     def triangulation(self) -> list[Triangle]:
